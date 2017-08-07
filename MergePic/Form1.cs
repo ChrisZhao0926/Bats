@@ -1441,6 +1441,34 @@ namespace MergePic
             }
         }
 
+        public void GetNodes(XmlNodeList xmlNode, List<String> listImage, string type)
+        {
+            foreach (XmlNode xNode in xmlNode)
+            {
+                if (type != "All")
+                {
+                    if (xNode.NodeType == XmlNodeType.Element && xNode.Attributes["Name"].Value != "delete" && xNode.Attributes["Name"].Value != "deleted" && xNode.Attributes["Type"].Value == type)
+                    {
+                        listImage.Add(xNode.Attributes["Name"].Value);
+                        if (xNode.HasChildNodes)
+                        {
+                            GetNodes(xNode.ChildNodes, listImage, type);
+                        }
+                    }
+                }
+                else
+                {
+                    if (xNode.NodeType == XmlNodeType.Element && xNode.Attributes["Name"].Value != "delete" && xNode.Attributes["Name"].Value != "deleted")
+                    {
+                        listImage.Add(xNode.Attributes["Name"].Value);
+                        if (xNode.HasChildNodes)
+                        {
+                            GetNodes(xNode.ChildNodes, listImage, type);
+                        }
+                    }
+                }
+            }
+        }
         private void buttonCompare_Click(object sender, EventArgs e)
         {
             List<String> listLocal = new List<string>();
@@ -1451,47 +1479,85 @@ namespace MergePic
             }
             else
             {
+                
                 listLocal.Clear();
                 listServer.Clear();
                 listBoxLocal.Items.Clear();
                 listBoxServer.Items.Clear();
-                //get all image name without language code
-                DirectoryInfo CurrentDir = new DirectoryInfo(textBoxLocal.Text);
-                foreach (FileInfo f in CurrentDir.GetFiles())
+                
+                //get all language folder and output
+                string[] languages = Directory.GetDirectories(textBoxLocal.Text, "*", SearchOption.TopDirectoryOnly);
+                foreach (string lan in languages)
                 {
-                    if (f.Name != "Thumbs.db")
+                    listBoxLocal.Items.Add(lan);
+                }
+                listBoxLocal.Items.Add("Total Languages : " + languages.Length);
+                listBoxLocal.Items.Add(" ");
+                //get feature name from selected path
+                string parentName = Path.GetDirectoryName(textBoxXML.Text);
+                string featureName = textBoxXML.Text.Substring(parentName.Length + 1);
+
+                //get folder path include feature name
+                string[] dirs = Directory.GetDirectories(textBoxLocal.Text, featureName, SearchOption.AllDirectories);
+                foreach (string dir in dirs)
+                {
+                    listBoxLocal.Items.Add("*******************************" + dir + "*******************************");
+                    listBoxServer.Items.Add("*******************************" + dir + "*******************************");
+                    //get all image name without language code
+                    DirectoryInfo CurrentDir = new DirectoryInfo(dir);
+                    foreach (FileInfo f in CurrentDir.GetFiles())
                     {
-                        string imageName = f.Name.Substring(0, f.Name.Length - 10);
-                        listLocal.Add(imageName);
+                        if (f.Name != "Thumbs.db")
+                        {
+                            string imageName = f.Name.Substring(0, f.Name.Length - 10);
+                            listLocal.Add(imageName);
+                        }
                     }
-                }
-                FileInfo fileInfo = new FileInfo(this.folderBrowserDialogXML.SelectedPath + "\\data.xml");
-                if (fileInfo.Exists == false)
-                {
-                    MessageBox.Show("Data File Error ! xml file not exist! ", "Warning");
-                }
-                else
-                {
-                    XmlDocument xmlDocument = new XmlDocument();
-                    xmlDocument.Load(fileInfo.ToString());
-                    XmlNodeList nodeList = xmlDocument.GetElementsByTagName("Item");
-                    foreach (XmlNode node in nodeList)
+                    FileInfo fileInfo = new FileInfo(this.textBoxXML.Text + "\\data.xml");
+                    if (fileInfo.Exists == false)
                     {
-                        listServer.Add(node.Attributes["Name"].Value);
+                        MessageBox.Show("Data File Error ! xml file not exist! ", "Warning");
                     }
-                }
-                List<String> listCompare = listServer.Except(listLocal).ToList();
-                labelMiss.Text = "Missing: " + listCompare.Count;
-                foreach (string i in listCompare)
-                {
-                    listBoxLocal.Items.Add(i);
-                }
-                listCompare.Clear();
-                listCompare = listLocal.Except(listServer).ToList();
-                labelMore.Text = "Superfluous: " + listCompare.Count;
-                foreach (string i in listCompare)
-                {
-                    listBoxServer.Items.Add(i);
+                    else
+                    {
+                        string radioLang = "";
+                        foreach (Control cl in this.groupBoxType.Controls)
+                        {
+                            if (cl is RadioButton)
+                            {
+                                RadioButton rb = (RadioButton)cl;
+                                if (rb.Checked)
+                                {
+                                    radioLang = rb.Text;
+                                }
+                            }
+                        }
+                        XmlDocument xmlDocument = new XmlDocument();
+                        xmlDocument.Load(fileInfo.ToString());
+                        XmlNodeList nodeList = xmlDocument.DocumentElement.ChildNodes;
+                        GetNodes(nodeList, listServer, radioLang);
+                    }
+                    List<String> listCompare = listServer.Except(listLocal).ToList();
+                    //labelMiss.Text = "Missing: " + listCompare.Count;
+                    foreach (string i in listCompare)
+                    {
+                        listBoxLocal.Items.Add(i);
+                    }
+                    listBoxLocal.Items.Add(" ");
+                    listBoxLocal.Items.Add("Missing: --------------->" + listCompare.Count);
+                    listBoxLocal.Items.Add(" ");
+                    listCompare.Clear();
+                    listCompare = listLocal.Except(listServer).ToList();
+                    //labelMore.Text = "Superfluous: " + listCompare.Count;
+                    foreach (string i in listCompare)
+                    {
+                        listBoxServer.Items.Add(i);
+                    }
+                    listBoxServer.Items.Add(" ");
+                    listBoxServer.Items.Add("Superfluous:---------------> " + listCompare.Count );
+                    listBoxServer.Items.Add(" ");
+                    listLocal.Clear();
+                    listServer.Clear();
                 }
             }
         }
